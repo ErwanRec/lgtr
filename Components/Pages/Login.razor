@@ -1,0 +1,15 @@
+@page "/login"
+@page "/"
+@attribute [AllowAnonymous]
+
+<PageTitle>Connexion - Loup-Garou</PageTitle>
+
+<div class="login-page">
+    <h1>Connexion</h1>
+    <p>Entrez votre code d'accès.</p>
+
+    <form method="post" action="/api/login" data-enhance="false">
+        <input type="text" name="accessCode" placeholder="Code d'accès" />
+        <button type="submit">Se connecter</button>
+    </form>
+</div>

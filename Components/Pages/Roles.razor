@@ -1,0 +1,214 @@
+@page "/roles"
+@attribute [AllowAnonymous]
+
+@using Microsoft.AspNetCore.Authorization
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.EntityFrameworkCore
+@using WerewolfGM.Web.Data
+@using WerewolfGM.Web.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>Tous les rôles - Loup-Garou</PageTitle>
+
+<div class="roles-page">
+
+    <header class="roles-page-header">
+
+        <div>
+            <p class="eyebrow">LOUP-GAROU</p>
+
+            <h1>Tous les rôles</h1>
+
+            <p>
+                Découvrez les différents rôles présents dans la partie.
+            </p>
+        </div>
+
+        <a class="roles-back-button"
+        href="@(IsGameMaster ? "/mj/tableau-de-bord" : "/accueil")">
+            ← Retour
+        </a>
+
+    </header>
+
+    @if (Loading)
+    {
+        <div class="loading-box">
+            Chargement des rôles...
+        </div>
+    }
+    else if (AllRoles.Count == 0)
+    {
+        <div class="empty-box">
+            Aucun rôle n'est disponible.
+        </div>
+    }
+    else
+    {
+        <div class="roles-grid">
+
+            @foreach (var role in AllRoles)
+            {
+                <button class="role-card-button"
+                        @onclick="() => OpenRole(role)">
+
+                    <div class="role-card">
+
+                        <div class="role-card-image">
+
+                            <img src="@GetRoleImageUrl(role.Name)"
+                                 alt="@role.Name"
+                                 onerror="this.style.display='none';" />
+
+                            <div class="role-card-fallback">
+                                @role.Emoji
+                            </div>
+
+                        </div>
+
+                        <div class="role-card-title">
+                            @role.Name
+                        </div>
+
+                    </div>
+
+                </button>
+            }
+
+        </div>
+    }
+
+</div>
+
+@if (SelectedRole is not null)
+{
+    <div class="role-modal-overlay"
+         @onclick="CloseRole">
+
+        <div class="role-modal"
+             @onclick:stopPropagation="true">
+
+            <button class="modal-close"
+                    @onclick="CloseRole">
+                ×
+            </button>
+
+            <div class="modal-role-image">
+
+                <img src="@GetRoleImageUrl(SelectedRole.Name)"
+                     alt="@SelectedRole.Name"
+                     onerror="this.style.display='none';" />
+
+                <div class="role-card-fallback">
+                    @SelectedRole.Emoji
+                </div>
+
+            </div>
+
+            <div class="modal-role-content">
+
+                <span class="role-camp">
+                    @SelectedRole.Camp
+                </span>
+
+                <h2>@SelectedRole.Name</h2>
+
+                <h3>Description</h3>
+
+                <p>
+                    @SelectedRole.FullDescription
+                </p>
+
+                @if (SelectedRole.HasFixedTimeAction)
+                {
+                    <div class="role-effect-box">
+                        <strong>Action à horaire fixe</strong>
+
+                        <span>
+                            Ce rôle possède une action liée à un horaire
+                            ou à une phase précise de la partie.
+                        </span>
+                    </div>
+                }
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code {
+
+    private bool IsGameMaster;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        IsGameMaster = authState.User.FindFirst("IsGameMaster")?.Value == "true";
+
+        await LoadRoles();
+    }
+
+    private bool Loading = true;
+
+    private List<RoleDefinition> AllRoles = new();
+
+    private RoleDefinition? SelectedRole;
+    
+    private async Task LoadRoles()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        AllRoles = await db.RoleDefinitions
+            .AsNoTracking()
+            .OrderBy(r => r.Camp)
+            .ThenBy(r => r.Name)
+            .ToListAsync();
+
+        Loading = false;
+    }
+
+    private void OpenRole(RoleDefinition role)
+    {
+        SelectedRole = role;
+    }
+
+    private void CloseRole()
+    {
+        SelectedRole = null;
+    }
+
+    private string GetRoleImageUrl(string roleName)
+    {
+        var slug = Slugify(roleName);
+        return $"/images/roles/{slug}.png";
+    }
+
+    private static string Slugify(string text)
+    {
+        var normalized = text.Normalize(
+            System.Text.NormalizationForm.FormD);
+
+        var chars = normalized
+            .Where(c =>
+                System.Globalization.CharUnicodeInfo
+                    .GetUnicodeCategory(c)
+                != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray();
+
+        return new string(chars)
+            .Normalize(System.Text.NormalizationForm.FormC)
+            .ToLowerInvariant()
+            .Replace(" ", "-")
+            .Replace("'", "")
+            .Replace("’", "")
+            .Replace("(", "")
+            .Replace(")", "")
+            .Replace("?", "")
+            .Replace("!", "");
+    }
+}

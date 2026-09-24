@@ -1,0 +1,121 @@
+@page "/regles"
+@attribute [AllowAnonymous]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Règles - Loup-Garou</PageTitle>
+
+<div class="rules-page">
+
+    <header class="roles-page-header">
+        <div>
+            <p class="eyebrow">LOUP-GAROU</p>
+            <h1>Règles du jeu</h1>
+        </div>
+
+        <a class="roles-back-button"
+        href="@(IsGameMaster ? "/mj/tableau-de-bord" : "/accueil")">
+            ← Retour
+        </a>
+    </header>
+
+    <section class="rules-section">
+        <h2>Règles générales</h2>
+        <ul>
+            <li>La partie se déroule sur plusieurs jours. Les votes du village ont lieu en journée. Le soir sont effectués le vote des loups ainsi que les autres effets/pouvoirs des personnages.</li>
+            <li>Il est interdit de dévoiler explicitement son rôle dans un groupe (même dans un petit groupe). Par fair-play, ne dévoilez pas votre rôle.</li>
+            <li>La victoire est remportée lorsqu'un seul clan est encore en vie.</li>
+        </ul>
+    </section>
+
+    <section class="rules-section">
+        <h2>Déroulement de la journée</h2>
+        <ul>
+            <li>Le matin, l'annonce des morts est faite dans un groupe commun.</li>
+            <li>Le vote du village a lieu à 13h30, après l'annonce des morts.</li>
+            <li>Tout le monde n'est pas obligé de voter, mais il faut qu'il y ait une majorité de votants pour que le vote soit comptabilisé.</li>
+        </ul>
+    </section>
+
+    <section class="rules-section">
+        <h2>Ordre et gestion des rôles</h2>
+        <p>Certains rôles s'exécutent à des heures fixes, tandis que les autres peuvent se faire librement pendant la journée.</p>
+
+        <p><strong>Déroulé classique des rôles à action à heure fixe :</strong></p>
+        <ol>
+            <li>Annonce des morts</li>
+            <li>Squatteur</li>
+            <li>Boulanger</li>
+            <li>Hypnotiseur</li>
+            <li>Vote du village</li>
+            <li>Vote des loups</li>
+            <li>Grand méchant loup</li>
+            <li>Loup blanc</li>
+            <li>Sorcière</li>
+        </ol>
+
+        <p>Les rôles qui ne sont pas mentionnés n'ont pas d'action à faire à heure fixe.</p>
+    </section>
+
+    <section class="rules-section">
+        <h2>Règles concernant les morts</h2>
+        <ul>
+            <li>Les joueurs morts disposent d'un salon spécial pour discuter de leurs informations et peuvent ajouter un vote au vote du village.</li>
+            <li>Il est strictement interdit aux joueurs vivants de parler aux morts pour obtenir des informations, sous peine d'exclusion immédiate de la partie. Restez fair-play 👁️👁️</li>
+        </ul>
+    </section>
+
+    <section class="rules-section">
+        <h2>Triche</h2>
+        <p>Toute forme de triche peut entraîner une mort immédiate décidée par les MJ, pour le bon déroulement du jeu pour tous les joueurs.</p>
+    </section>
+
+    <section class="rules-section rules-section-wolves">
+        <h2>🐺 Loups</h2>
+
+        <h3>Votes des loups</h3>
+        <ul>
+            <li>Les loups votent dans un groupe WhatsApp réservé uniquement aux loups.</li>
+            <li>À 22h, un message est envoyé sur ce groupe et les loups disposent de 30 minutes pour envoyer leur vote.</li>
+            <li>Pour chaque loup, seul le dernier nom envoyé dans les 30 minutes est pris en compte.</li>
+            <li>Chaque loup ne peut voter que pour un seul joueur qu'il doit avoir ciblé dans la journée.</li>
+        </ul>
+
+        <h3>Ciblage d'un joueur par un loup</h3>
+        <p>Il existe deux manières de cibler un joueur :</p>
+        <ol>
+            <li>Déposer un bout de papier (écrit ou non) dans les affaires de la cible, puis prévenir le MJ. Ce ciblage est valable pour toute la partie.</li>
+            <li>Parler en réel avec un autre loup et se partager leurs cibles — les deux loups doivent alors prévenir le MJ qu'ils se sont parlés.</li>
+        </ol>
+
+        <h3>Hiérarchie des loups</h3>
+        <ul>
+            <li>Chaque loup possède une classe sociale en plus de son rôle (du plus au moins haut) : Loup-garou alpha, Loup-garou, Loup-presque-garou.</li>
+            <li>La meute est initialement composée du loup-garou alpha et des loups-garous.</li>
+            <li>Les loups-presque-garous doivent retrouver les membres de la meute afin de pouvoir la rejoindre et voter le soir avec eux.</li>
+            <li>Chaque loup reçoit deux noms de joueurs sans savoir leur rôle : les loups-garous reçoivent le nom d'un loup-presque-garou, et inversement.</li>
+            <li>Pour qu'un loup-presque-garou rejoigne la meute, le loup-garou alpha doit demander au MJ de l'ajouter.</li>
+        </ul>
+
+        <h3>Pouvoir du Killer</h3>
+        <ul>
+            <li>Des joueurs désignés par les MJ disposent du pouvoir du killer en plus de leur rôle.</li>
+            <li>Ce pouvoir permet d'éliminer n'importe quel joueur si le killer donne son nom et son rôle au MJ.</li>
+            <li>Si le killer se trompe, il meurt immédiatement.</li>
+        </ul>
+    </section>
+
+</div>
+
+@code {
+
+    private bool IsGameMaster;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        IsGameMaster = authState.User.FindFirst("IsGameMaster")?.Value == "true";
+    }
+}

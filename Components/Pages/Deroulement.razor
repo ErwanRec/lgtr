@@ -1,0 +1,323 @@
+@page "/deroulement"
+@attribute [AllowAnonymous]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using WerewolfGM.Web.Data
+@using WerewolfGM.Web.Models
+
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Déroulement de la partie - Loup-Garou</PageTitle>
+
+<div class="deroulement-page">
+
+    <header class="roles-page-header">
+        <div>
+            <p class="eyebrow">LOUP-GAROU</p>
+            <h1>Déroulement de la partie</h1>
+        </div>
+
+        <a class="roles-back-button" href="@(IsGameMaster ? "/mj/tableau-de-bord" : "/accueil")">← Retour</a>
+    </header>
+
+    @if (Loading)
+    {
+        <div class="loading-box">Chargement...</div>
+    }
+    else
+    {
+        <section class="deroulement-section">
+            <h2>Joueurs en vie (@AlivePlayers.Count)</h2>
+
+            @if (AlivePlayers.Count == 0)
+            {
+                <div class="empty-box">Plus aucun joueur en vie.</div>
+            }
+            else
+            {
+                <div class="roles-grid">
+                    @foreach (var player in AlivePlayers)
+                    {
+                        <div class="deroulement-card">
+
+                            @if (IsGameMaster && player.RoleDefinition is not null)
+                            {
+                                <button class="role-card-button" @onclick="() => OpenRole(player.RoleDefinition)">
+                                    <div class="role-card">
+                                        <div class="role-card-image">
+                                            <img src="@GetRoleImageUrl(player.RoleDefinition.Name)"
+                                                alt="@player.RoleDefinition.Name"
+                                                onerror="this.style.display='none';" />
+                                            <div class="role-card-fallback">@player.RoleDefinition.Emoji</div>
+                                        </div>
+                                        <div class="role-card-title">
+                                            <span class="name-alive">@player.FullName</span>
+                                            <span class="admin-access-code">🔑 @player.AccessCode</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            }
+                            else
+                            {
+                                <div class="player-card player-card-alive">
+                                    <div class="player-card-avatar">🙂</div>
+                                    <div class="role-card-title">
+                                        <span class="name-alive">@player.FullName</span>
+                                        @if (IsGameMaster)
+                                        {
+                                            <span class="admin-access-code">🔑 @player.AccessCode</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            @if (IsGameMaster)
+                            {
+                                <div class="card-note-box">
+                                    <textarea class="note-textarea"
+                                              rows="2"
+                                              placeholder="Note..."
+                                              @bind="NoteDrafts[player.Id]"></textarea>
+                                    <button class="note-save-button" @onclick="() => SaveNote(player.Id)">
+                                        Enregistrer
+                                    </button>
+                                    @if (SavedFlags.Contains(player.Id))
+                                    {
+                                        <span class="note-saved-flag">✓</span>
+                                    }
+                                </div>
+                            }
+
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="deroulement-section">
+            <h2>Morts (@DeadPlayers.Count)</h2>
+
+            @if (DeadPlayers.Count == 0)
+            {
+                <div class="empty-box">Aucun mort pour le moment.</div>
+            }
+            else
+            {
+                <div class="roles-grid">
+                    @foreach (var player in DeadPlayers)
+                    {
+                        <div class="deroulement-card">
+
+                            <button class="role-card-button dead" @onclick="() => OpenRole(player.RoleDefinition)">
+                                <div class="role-card role-card-dead">
+                                    <div class="role-card-image">
+                                        @if (player.RoleDefinition is not null)
+                                        {
+                                            <img src="@GetRoleImageUrl(player.RoleDefinition.Name)"
+                                                 alt="@player.RoleDefinition.Name"
+                                                 onerror="this.style.display='none';" />
+                                            <div class="role-card-fallback">@player.RoleDefinition.Emoji</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="role-card-fallback">💀</div>
+                                        }
+                                    </div>
+                                    <div class="role-card-title">
+                                        <span class="name-dead">@player.FullName</span>
+                                        @if (player.RoleDefinition is not null)
+                                        {
+                                            <span class="dead-role-name"> — @player.RoleDefinition.Name</span>
+                                        }
+                                        @if (IsGameMaster)
+                                        {
+                                            <span class="admin-access-code">🔑 @player.AccessCode</span>
+                                        }
+                                    </div>
+                                </div>
+                            </button>
+
+                            <div class="card-note-box">
+                                <textarea class="note-textarea"
+                                          rows="2"
+                                          placeholder="Note..."
+                                          @bind="NoteDrafts[player.Id]"></textarea>
+                                <button class="note-save-button" @onclick="() => SaveNote(player.Id)">
+                                    Enregistrer
+                                </button>
+                                @if (SavedFlags.Contains(player.Id))
+                                {
+                                    <span class="note-saved-flag">✓</span>
+                                }
+                            </div>
+
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+
+</div>
+
+@if (SelectedRole is not null)
+{
+    <div class="role-modal-overlay" @onclick="CloseRole">
+        <div class="role-modal" @onclick:stopPropagation="true">
+            <button class="modal-close" @onclick="CloseRole">×</button>
+
+            <div class="modal-role-image">
+                <img src="@GetRoleImageUrl(SelectedRole.Name)" alt="@SelectedRole.Name"
+                     onerror="this.style.display='none';" />
+                <div class="role-card-fallback">@SelectedRole.Emoji</div>
+            </div>
+
+            <div class="modal-role-content">
+                <span class="role-camp">@SelectedRole.Camp</span>
+                <h2>@SelectedRole.Name</h2>
+                <h3>Description</h3>
+                <p>@SelectedRole.FullDescription</p>
+
+                @if (SelectedRole.HasFixedTimeAction)
+                {
+                    <div class="role-effect-box">
+                        <strong>Action à horaire fixe</strong>
+                        <span>Ce rôle possède une action liée à un horaire ou à une phase précise de la partie.</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+
+    private bool Loading = true;
+    private bool IsGameMaster;
+    private int CurrentPlayerId;
+
+    private List<Player> AlivePlayers = new();
+    private List<Player> DeadPlayers = new();
+
+    private Dictionary<int, string> NoteDrafts = new();
+    private HashSet<int> SavedFlags = new();
+
+    private RoleDefinition? SelectedRole;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        IsGameMaster = authState.User.FindFirst("IsGameMaster")?.Value == "true";
+
+        var playerIdClaim = authState.User.FindFirst("PlayerId")?.Value;
+        int.TryParse(playerIdClaim, out CurrentPlayerId);
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var players = await db.Players
+            .Include(p => p.RoleDefinition)
+            .Where(p => !p.IsGameMaster)
+            .OrderBy(p => p.FirstName)
+            .ThenBy(p => p.LastName)
+            .ToListAsync();
+
+        AlivePlayers = players.Where(p => p.IsAlive).ToList();
+        DeadPlayers = players.Where(p => !p.IsAlive).ToList();
+
+        if (CurrentPlayerId != 0)
+        {
+            var existingNotes = await db.PlayerNotes
+                .Where(n => n.AuthorPlayerId == CurrentPlayerId)
+                .ToListAsync();
+
+            foreach (var player in players)
+            {
+                var existing = existingNotes.FirstOrDefault(n => n.TargetPlayerId == player.Id);
+                NoteDrafts[player.Id] = existing?.Content ?? string.Empty;
+            }
+        }
+
+        Loading = false;
+    }
+
+    private async Task SaveNote(int targetPlayerId)
+    {
+        if (CurrentPlayerId == 0) return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var note = await db.PlayerNotes
+            .FirstOrDefaultAsync(n => n.AuthorPlayerId == CurrentPlayerId
+                                    && n.TargetPlayerId == targetPlayerId);
+
+        var content = NoteDrafts.GetValueOrDefault(targetPlayerId, string.Empty);
+
+        if (note is null)
+        {
+            note = new PlayerNote
+            {
+                AuthorPlayerId = CurrentPlayerId,
+                TargetPlayerId = targetPlayerId,
+                Content = content,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            db.PlayerNotes.Add(note);
+        }
+        else
+        {
+            note.Content = content;
+            note.UpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync();
+
+        SavedFlags.Add(targetPlayerId);
+        StateHasChanged();
+
+        _ = Task.Delay(2000).ContinueWith(_ =>
+        {
+            SavedFlags.Remove(targetPlayerId);
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void OpenRole(RoleDefinition? role)
+    {
+        if (role is not null)
+        {
+            SelectedRole = role;
+        }
+    }
+
+    private void CloseRole() => SelectedRole = null;
+
+    private string GetRoleImageUrl(string roleName)
+    {
+        var slug = Slugify(roleName);
+        return $"/images/roles/{slug}.png";
+    }
+
+    private static string Slugify(string text)
+    {
+        var normalized = text.Normalize(System.Text.NormalizationForm.FormD);
+
+        var chars = normalized
+            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
+                        != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray();
+
+        return new string(chars)
+            .Normalize(System.Text.NormalizationForm.FormC)
+            .ToLowerInvariant()
+            .Replace(" ", "-")
+            .Replace("'", "")
+            .Replace("’", "")
+            .Replace("(", "")
+            .Replace(")", "")
+            .Replace("?", "")
+            .Replace("!", "");
+    }
+}

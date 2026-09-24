@@ -1,0 +1,7 @@
+C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\lgtr.csproj.AssemblyReference.cache
+C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\rpswa.dswa.cache.json
+C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\lgtr.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\lgtr.AssemblyInfoInputs.cache
+C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\lgtr.AssemblyInfo.cs
+C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\lgtr.csproj.CoreCompileInputs.cache
+C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\lgtr.MvcApplicationPartsAssemblyInfo.cache

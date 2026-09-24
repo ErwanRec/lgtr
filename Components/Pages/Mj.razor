@@ -1,0 +1,120 @@
+@page "/mj/tableau-de-bord"
+@attribute [Authorize(Policy = "GameMaster")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using WerewolfGM.Web.Data
+@using WerewolfGM.Web.Models
+
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Tableau de bord MJ - Loup-Garou</PageTitle>
+
+<div class="admin-page">
+
+    <header class="roles-page-header">
+        <div>
+            <p class="eyebrow">MAÎTRE DU JEU</p>
+            <h1>Bienvenue @MjName</h1>
+        </div>
+    </header>
+
+    @if (Loading)
+    {
+        <div class="loading-box">Chargement...</div>
+    }
+    else
+    {
+        <section class="admin-section admin-summary">
+            <div class="admin-summary-card">
+                <span class="admin-summary-number">@TotalPlayers</span>
+                <span class="admin-summary-label">Joueurs</span>
+            </div>
+            <div class="admin-summary-card">
+                <span class="admin-summary-number">@AliveCount</span>
+                <span class="admin-summary-label">Vivants</span>
+            </div>
+            <div class="admin-summary-card">
+                <span class="admin-summary-number">@DeadCount</span>
+                <span class="admin-summary-label">Morts</span>
+            </div>
+        </section>
+
+        <section class="admin-section">
+            <h2>Actions</h2>
+
+            <div class="admin-dashboard-links">
+                <a class="admin-dashboard-link" href="/mj/gestion-partie">
+                    <span class="admin-dashboard-link-icon">🎲</span>
+                    <span>
+                        <strong>Gérer la partie</strong>
+                        <p>Lancer une nouvelle partie, gérer les morts, changer les rôles</p>
+                    </span>
+                </a>
+
+                <a class="admin-dashboard-link" href="/deroulement">
+                    <span class="admin-dashboard-link-icon">📖</span>
+                    <span>
+                        <strong>Déroulement de la partie</strong>
+                        <p>Voir la composition et l'avancement de la partie en cours</p>
+                    </span>
+                </a>
+
+                <a class="admin-dashboard-link" href="/roles">
+                    <span class="admin-dashboard-link-icon">📚</span>
+                    <span>
+                        <strong>Tous les rôles</strong>
+                        <p>Consulter le catalogue complet des rôles</p>
+                    </span>
+                </a>
+
+                <a class="admin-dashboard-link" href="/regles">
+                    <span class="admin-dashboard-link-icon">📜</span>
+                    <span>
+                        <strong>Règles du jeu</strong>
+                        <p>Revoir les règles générales et le déroulé des heures fixes</p>
+                    </span>
+                </a>
+
+                <a class="admin-dashboard-link" href="/mj/notes">
+                    <span class="admin-dashboard-link-icon">📝</span>
+                    <span>
+                        <strong>Notes des joueurs</strong>
+                        <p>Voir les notes écrites par chaque joueur sur les autres</p>
+                    </span>
+                </a>
+            </div>
+        </section>
+    }
+
+</div>
+
+@code {
+
+    private bool Loading = true;
+    private string MjName = "MJ";
+
+    private int TotalPlayers;
+    private int AliveCount;
+    private int DeadCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        MjName = authState.User.Identity?.Name ?? "MJ";
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var players = await db.Players
+            .Where(p => !p.IsGameMaster)
+            .ToListAsync();
+
+        TotalPlayers = players.Count;
+        AliveCount = players.Count(p => p.IsAlive);
+        DeadCount = players.Count(p => !p.IsAlive);
+
+        Loading = false;
+    }
+}

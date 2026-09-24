@@ -1,0 +1,101 @@
+@page "/mj/notes"
+@attribute [Authorize(Policy = "GameMaster")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using WerewolfGM.Web.Data
+@using WerewolfGM.Web.Models
+
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>Notes des joueurs - MJ</PageTitle>
+
+<div class="admin-page">
+
+    <header class="roles-page-header">
+        <div>
+            <p class="eyebrow">MAÎTRE DU JEU</p>
+            <h1>Notes des joueurs</h1>
+            <p>Consultez les notes écrites par chaque joueur sur les autres.</p>
+        </div>
+        <a class="roles-back-button" href="/mj/tableau-de-bord">← Retour</a>
+    </header>
+
+    @if (Loading)
+    {
+        <div class="loading-box">Chargement...</div>
+    }
+    else if (NotesByAuthor.All(g => g.Notes.Count == 0))
+    {
+        <div class="empty-box">Aucune note n'a encore été écrite.</div>
+    }
+    else
+    {
+        @foreach (var group in NotesByAuthor)
+        {
+            @if (group.Notes.Count > 0)
+            {
+                <section class="admin-section">
+                    <h2>📝 Notes de @group.Author.FullName</h2>
+
+                    <table class="admin-players-table">
+                        <thead>
+                            <tr>
+                                <th>Sur qui</th>
+                                <th>Note</th>
+                                <th>Dernière modification</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var note in group.Notes)
+                            {
+                                <tr>
+                                    <td>@note.Target.FullName</td>
+                                    <td>@note.Content</td>
+                                    <td>@note.UpdatedAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </section>
+            }
+        }
+    }
+
+</div>
+
+@code {
+
+    private bool Loading = true;
+
+    private List<AuthorNotes> NotesByAuthor = new();
+
+    private record AuthorNotes(Player Author, List<PlayerNote> Notes);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var players = await db.Players
+            .Where(p => !p.IsGameMaster)
+            .OrderBy(p => p.FirstName)
+            .ThenBy(p => p.LastName)
+            .ToListAsync();
+
+        var notes = await db.PlayerNotes
+            .Include(n => n.Target)
+            .Where(n => n.Content != null && n.Content != string.Empty)
+            .ToListAsync();
+
+        NotesByAuthor = players
+            .Select(p => new AuthorNotes(
+                p,
+                notes.Where(n => n.AuthorPlayerId == p.Id)
+                     .OrderBy(n => n.Target.FirstName)
+                     .ThenBy(n => n.Target.LastName)
+                     .ToList()))
+            .ToList();
+
+        Loading = false;
+    }
+}

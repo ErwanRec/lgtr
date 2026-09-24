@@ -1,0 +1,146 @@
+@page "/notes"
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using WerewolfGM.Web.Data
+@using WerewolfGM.Web.Models
+
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Mes notes - Loup-Garou</PageTitle>
+
+<div class="notes-page">
+
+    <header class="roles-page-header">
+        <div>
+            <p class="eyebrow">LOUP-GAROU</p>
+            <h1>Mes notes</h1>
+            <p>Vos notes personnelles sur chaque joueur (visibles par vous seul).</p>
+        </div>
+        <a class="roles-back-button" href="/accueil">← Retour</a>
+    </header>
+
+    @if (Loading)
+    {
+        <div class="loading-box">Chargement...</div>
+    }
+    else
+    {
+        <div class="notes-list">
+            @foreach (var player in Players)
+            {
+                <div class="note-row @(player.Id == CurrentPlayerId ? "note-row-self" : "")">
+                    <div class="note-row-name">
+                        @player.FullName
+                        @if (player.Id == CurrentPlayerId)
+                        {
+                            <span class="note-self-tag">(vous)</span>
+                        }
+                        @if (!player.IsAlive)
+                        {
+                            <span class="note-dead-tag">💀</span>
+                        }
+                    </div>
+
+                    <textarea class="note-textarea"
+                              rows="2"
+                              placeholder="Écrire une note..."
+                              @bind="NoteDrafts[player.Id]"></textarea>
+
+                    <button class="note-save-button"
+                            @onclick="() => SaveNote(player.Id)">
+                        Enregistrer
+                    </button>
+
+                    @if (SavedFlags.Contains(player.Id))
+                    {
+                        <span class="note-saved-flag">✓ enregistré</span>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+</div>
+
+@code {
+
+    private bool Loading = true;
+    private int CurrentPlayerId;
+
+    private List<Player> Players = new();
+    private Dictionary<int, string> NoteDrafts = new();
+    private HashSet<int> SavedFlags = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var playerIdClaim = authState.User.FindFirst("PlayerId")?.Value;
+        int.TryParse(playerIdClaim, out CurrentPlayerId);
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        Players = await db.Players
+            .Where(p => !p.IsGameMaster)
+            .OrderBy(p => p.FirstName)
+            .ThenBy(p => p.LastName)
+            .ToListAsync();
+
+        var existingNotes = await db.PlayerNotes
+            .Where(n => n.AuthorPlayerId == CurrentPlayerId)
+            .ToListAsync();
+
+        foreach (var player in Players)
+        {
+            var existing = existingNotes.FirstOrDefault(n => n.TargetPlayerId == player.Id);
+            NoteDrafts[player.Id] = existing?.Content ?? string.Empty;
+        }
+
+        Loading = false;
+    }
+
+    private async Task SaveNote(int targetPlayerId)
+    {
+        if (CurrentPlayerId == 0) return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var note = await db.PlayerNotes
+            .FirstOrDefaultAsync(n => n.AuthorPlayerId == CurrentPlayerId
+                                    && n.TargetPlayerId == targetPlayerId);
+
+        var content = NoteDrafts.GetValueOrDefault(targetPlayerId, string.Empty);
+
+        if (note is null)
+        {
+            note = new PlayerNote
+            {
+                AuthorPlayerId = CurrentPlayerId,
+                TargetPlayerId = targetPlayerId,
+                Content = content,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            db.PlayerNotes.Add(note);
+        }
+        else
+        {
+            note.Content = content;
+            note.UpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync();
+
+        SavedFlags.Add(targetPlayerId);
+        StateHasChanged();
+
+        // fait disparaître le "✓ enregistré" après 2 secondes
+        _ = Task.Delay(2000).ContinueWith(_ =>
+        {
+            SavedFlags.Remove(targetPlayerId);
+            InvokeAsync(StateHasChanged);
+        });
+    }
+}

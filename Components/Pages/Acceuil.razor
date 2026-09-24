@@ -1,0 +1,227 @@
+@page "/accueil"
+@attribute [AllowAnonymous]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using WerewolfGM.Web.Data
+@using WerewolfGM.Web.Models
+
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Accueil - Loup-Garou</PageTitle>
+
+<div class="player-home">
+
+    <header class="player-home-header">
+        <div>
+            <p class="eyebrow">LOUP-GAROU</p>
+            <h1>Bienvenue @PlayerName</h1>
+        </div>
+
+        <a class="roles-link" href="/roles">
+            📚 Tous les rôles
+        </a>
+        <a class="roles-link" href="/regles">
+            regles du mode de jeu
+        </a>
+        <a class="roles-link" href="/deroulement">
+            partie en cours
+        </a>
+        <a class="roles-link" href="/notes">
+            📝 Mes notes
+        </a>
+    </header>
+
+    @if (!Loading && !IsAlive)
+    {
+        <div class="death-banner">
+            💀 Vous êtes mort 
+        </div>
+    }
+
+    @if (Loading)
+    {
+        <div class="loading-box">
+            Chargement de votre rôle...
+        </div>
+    }
+    else
+    {
+        <section class="my-role-section">
+
+            <h2>Votre rôle</h2>
+
+            <div class="my-role-layout">
+
+                <div class="role-card-large">
+                    <div class="role-card-image @(!IsAlive ? "role-card-image-dead" : "")">
+                        <img src="@RoleImageUrl"
+                             alt="@RoleName"
+                             onerror="this.style.display='none';" />
+
+                        @if (!HasRole)
+                        {
+                            <div class="role-card-black-placeholder">
+                                <span>?</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="role-card-fallback">
+                                @RoleEmoji
+                            </div>
+                        }
+                    </div>
+
+                    <div class="role-card-name">
+                        @(HasRole ? RoleName : "Rôle non défini")
+                    </div>
+                </div>
+
+                <div class="my-role-info">
+                    @if (HasRole)
+                    {
+                        <span class="role-camp">
+                            @RoleCamp
+                        </span>
+
+                        <h2>@RoleName</h2>
+
+                        <p class="role-short-description">
+                            @RoleShortDescription
+                        </p>
+
+                        <a class="primary-button"
+                           href="/roles">
+                            Voir tous les rôles
+                        </a>
+                    }
+                    else
+                    {
+                        <h2>Votre rôle n'est pas encore défini</h2>
+
+                        <p>
+                            Le Maître du Jeu ne vous a pas encore attribué de rôle.
+                        </p>
+
+                        <a class="primary-button"
+                           href="/roles">
+                            Consulter les rôles
+                        </a>
+                    }
+                </div>
+
+            </div>
+
+        </section>
+    }
+
+</div>
+
+@code {
+
+    private bool Loading = true;
+
+    private bool IsAlive = true;
+
+    private bool HasRole;
+
+    private string PlayerName = "joueur";
+
+    private string RoleName = string.Empty;
+    private string RoleEmoji = "❓";
+    private string RoleCamp = string.Empty;
+    private string RoleShortDescription = string.Empty;
+
+    private string RoleImageUrl = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPlayer();
+    }
+
+    private async Task LoadPlayer()
+    {
+        try
+        {
+            // Récupération de l'utilisateur connecté
+            var authState = await AuthenticationStateProvider
+                .GetAuthenticationStateAsync();
+
+            var user = authState.User;
+
+            var playerIdClaim = user.FindFirst("PlayerId")?.Value;
+
+            PlayerName =
+                user.Identity?.Name
+                ?? "joueur";
+
+            if (!int.TryParse(playerIdClaim, out var playerId))
+            {
+                Loading = false;
+                return;
+            }
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var player = await db.Players
+                .Include(p => p.RoleDefinition)
+                .FirstOrDefaultAsync(p => p.Id == playerId);
+
+            if (player is not null)
+            {
+                IsAlive = player.IsAlive;
+            }
+
+            if (player?.RoleDefinition is not null)
+            {
+                HasRole = true;
+
+                RoleName = player.RoleDefinition.Name;
+                RoleEmoji = player.RoleDefinition.Emoji ?? "❓";
+                RoleCamp = player.RoleDefinition.Camp.ToString();
+                RoleShortDescription =
+                    player.RoleDefinition.ShortDescription ?? string.Empty;
+
+                RoleImageUrl = GetRoleImageUrl(RoleName);
+            }
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private string GetRoleImageUrl(string roleName)
+    {
+        var slug = Slugify(roleName);
+        return $"/images/roles/{slug}.png";
+    }
+
+    private static string Slugify(string text)
+    {
+        var normalized = text.Normalize(
+            System.Text.NormalizationForm.FormD);
+
+        var chars = normalized
+            .Where(c =>
+                System.Globalization.CharUnicodeInfo
+                    .GetUnicodeCategory(c)
+                != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray();
+
+        return new string(chars)
+            .Normalize(System.Text.NormalizationForm.FormC)
+            .ToLowerInvariant()
+            .Replace(" ", "-")
+            .Replace("'", "")
+            .Replace("’", "")
+            .Replace("(", "")
+            .Replace(")", "")
+            .Replace("?", "")
+            .Replace("!", "");
+    }
+}

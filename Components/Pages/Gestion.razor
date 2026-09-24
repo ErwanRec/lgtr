@@ -1,0 +1,334 @@
+@page "/mj/gestion-partie"
+@attribute [Authorize(Policy = "GameMaster")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using WerewolfGM.Web.Data
+@using WerewolfGM.Web.Models
+
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>Gestion de la partie - MJ</PageTitle>
+
+<div class="admin-page">
+
+    <header class="roles-page-header">
+        <div>
+            <p class="eyebrow">MAÎTRE DU JEU</p>
+            <h1>Gestion de la partie</h1>
+        </div>
+        <a class="roles-back-button" href="/mj/tableau-de-bord">← Retour</a>
+    </header>
+
+    <section class="admin-section">
+        <h2>🎲 Démarrer une nouvelle partie</h2>
+        <p class="admin-warning">
+            Cette action supprime tous les joueurs actuels (et leurs notes) et en recrée de nouveaux avec des rôles tirés au sort.
+        </p>
+
+        <div class="admin-form-grid">
+            <div>
+                <label>Noms des joueurs (un par ligne)</label>
+                <textarea rows="10" @bind="NamesInput" placeholder="Alice&#10;Bob&#10;Charlie"></textarea>
+            </div>
+            <div>
+                <label>Rôles à distribuer (un par ligne, même nombre que de noms)</label>
+                <textarea rows="10" @bind="RolesInput" placeholder="Loup-garou&#10;Voyante&#10;Simple villageois (Cogniticien)"></textarea>
+            </div>
+        </div>
+
+        <details class="admin-role-reference">
+            <summary>Voir les noms de rôles valides</summary>
+            <ul>
+                @foreach (var role in AllRoleNames)
+                {
+                    <li>@role</li>
+                }
+            </ul>
+        </details>
+
+        <button class="primary-button" @onclick="StartNewGame">
+            Lancer la partie
+        </button>
+
+        @if (StartErrors.Count > 0)
+        {
+            <div class="admin-error-box">
+                <strong>Impossible de lancer la partie :</strong>
+                <ul>
+                    @foreach (var error in StartErrors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (LastCreatedPlayers.Count > 0)
+        {
+            <div class="admin-success-box">
+                <strong>Partie créée. Distribuez ces codes d'accès :</strong>
+                <table class="admin-codes-table">
+                    <thead>
+                        <tr><th>Joueur</th><th>Code d'accès</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in LastCreatedPlayers)
+                        {
+                            <tr><td>@p.FullName</td><td><code>@p.AccessCode</code></td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="admin-section">
+        <h2>👥 Joueurs en cours de partie</h2>
+
+        @if (Loading)
+        {
+            <div class="loading-box">Chargement...</div>
+        }
+        else if (CurrentPlayers.Count == 0)
+        {
+            <div class="empty-box">Aucune partie en cours.</div>
+        }
+        else
+        {
+            <table class="admin-players-table">
+                <thead>
+                    <tr>
+                        <th>Joueur</th>
+                        <th>Code</th>
+                        <th>Statut</th>
+                        <th>Rôle actuel</th>
+                        <th>Changer de rôle</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var player in CurrentPlayers)
+                    {
+                        <tr class="@(player.IsAlive ? "" : "row-dead")">
+                            <td>@player.FullName</td>
+                            <td><code>@player.AccessCode</code></td>
+                            <td>@(player.IsAlive ? "🙂 Vivant" : "💀 Mort")</td>
+                            <td>@(player.RoleDefinition?.Name ?? "—")</td>
+                            <td>
+                                <select @bind="RoleChangeSelection[player.Id]">
+                                    <option value="0">-- choisir --</option>
+                                    @foreach (var role in AllRoles)
+                                    {
+                                        <option value="@role.Id">@role.Name</option>
+                                    }
+                                </select>
+                                <button @onclick="() => ChangeRole(player.Id)">Changer</button>
+                            </td>
+                            <td>
+                                @if (player.IsAlive)
+                                {
+                                    <button class="danger-button" @onclick="() => ToggleAlive(player.Id, false)">Tuer</button>
+                                }
+                                else
+                                {
+                                    <button class="success-button" @onclick="() => ToggleAlive(player.Id, true)">Ressusciter</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+</div>
+
+@code {
+
+    private bool Loading = true;
+
+    private string NamesInput = string.Empty;
+    private string RolesInput = string.Empty;
+
+    private List<string> AllRoleNames = new();
+    private List<RoleDefinition> AllRoles = new();
+
+    private List<Player> CurrentPlayers = new();
+    private List<Player> LastCreatedPlayers = new();
+
+    private Dictionary<int, int> RoleChangeSelection = new();
+
+    private List<string> StartErrors = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+    }
+
+    private async Task Refresh()
+    {
+        Loading = true;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        AllRoles = await db.RoleDefinitions
+            .AsNoTracking()
+            .OrderBy(r => r.Name)
+            .ToListAsync();
+        AllRoleNames = AllRoles.Select(r => r.Name).ToList();
+
+        CurrentPlayers = await db.Players
+            .Include(p => p.RoleDefinition)
+            .Where(p => !p.IsGameMaster)
+            .OrderBy(p => p.FirstName)
+            .ThenBy(p => p.LastName)
+            .ToListAsync();
+
+        RoleChangeSelection = CurrentPlayers.ToDictionary(p => p.Id, p => 0);
+
+        Loading = false;
+    }
+
+    private async Task StartNewGame()
+    {
+        StartErrors.Clear();
+        LastCreatedPlayers.Clear();
+
+        var names = NamesInput
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(n => n.Length > 0)
+            .ToList();
+
+        var roleNames = RolesInput
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(r => r.Length > 0)
+            .ToList();
+
+        if (names.Count == 0)
+        {
+            StartErrors.Add("Aucun nom fourni.");
+        }
+
+        if (roleNames.Count != names.Count)
+        {
+            StartErrors.Add($"Le nombre de rôles ({roleNames.Count}) ne correspond pas au nombre de noms ({names.Count}).");
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var rolesByName = await db.RoleDefinitions
+            .ToDictionaryAsync(r => r.Name, r => r, StringComparer.OrdinalIgnoreCase);
+
+        var unknownRoles = roleNames
+            .Where(r => !rolesByName.ContainsKey(r))
+            .Distinct()
+            .ToList();
+
+        if (unknownRoles.Count > 0)
+        {
+            StartErrors.Add("Rôles inconnus : " + string.Join(", ", unknownRoles));
+        }
+
+        if (StartErrors.Count > 0)
+        {
+            return;
+        }
+
+        // Tirage au sort : on mélange les rôles puis on les associe aux noms dans l'ordre
+        var shuffledRoles = roleNames
+            .OrderBy(_ => Random.Shared.Next())
+            .ToList();
+
+        // Supprime les joueurs (et leurs notes) de l'éventuelle partie précédente
+        var oldPlayers = await db.Players.Where(p => !p.IsGameMaster).ToListAsync();
+        var oldPlayerIds = oldPlayers.Select(p => p.Id).ToList();
+
+        var oldNotes = await db.PlayerNotes
+            .Where(n => oldPlayerIds.Contains(n.AuthorPlayerId) || oldPlayerIds.Contains(n.TargetPlayerId))
+            .ToListAsync();
+        db.PlayerNotes.RemoveRange(oldNotes);
+
+        db.Players.RemoveRange(oldPlayers);
+        await db.SaveChangesAsync();
+
+        // Recrée les codes existants (le MJ garde le sien)
+        var existingCodes = await db.Players.Select(p => p.AccessCode).ToHashSetAsync();
+
+        var created = new List<Player>();
+
+        for (int i = 0; i < names.Count; i++)
+        {
+            var role = rolesByName[shuffledRoles[i]];
+            var code = GenerateUniqueAccessCode(existingCodes);
+            existingCodes.Add(code);
+
+            var nameParts = names[i].Split(' ', 2, StringSplitOptions.TrimEntries);
+
+            var player = new Player
+            {
+                FirstName = nameParts[0],
+                LastName = nameParts.Length > 1 ? nameParts[1] : string.Empty,
+                AccessCode = code,
+                IsGameMaster = false,
+                IsAlive = true,
+                Camp = role.Camp,
+                RoleDefinitionId = role.Id
+            };
+
+            db.Players.Add(player);
+            created.Add(player);
+        }
+
+        await db.SaveChangesAsync();
+
+        LastCreatedPlayers = created;
+        NamesInput = string.Empty;
+        RolesInput = string.Empty;
+
+        await Refresh();
+    }
+
+    private static string GenerateUniqueAccessCode(HashSet<string> existing)
+    {
+        string code;
+        do
+        {
+            code = Random.Shared.Next(1000, 10000).ToString();
+        } while (existing.Contains(code));
+
+        return code;
+    }
+
+    private async Task ToggleAlive(int playerId, bool isAlive)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var player = await db.Players.FindAsync(playerId);
+        if (player is null) return;
+
+        player.IsAlive = isAlive;
+        await db.SaveChangesAsync();
+
+        await Refresh();
+    }
+
+    private async Task ChangeRole(int playerId)
+    {
+        if (!RoleChangeSelection.TryGetValue(playerId, out var roleId) || roleId == 0)
+        {
+            return;
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var player = await db.Players.FindAsync(playerId);
+        var role = await db.RoleDefinitions.FindAsync(roleId);
+        if (player is null || role is null) return;
+
+        player.RoleDefinitionId = role.Id;
+        player.Camp = role.Camp;
+        await db.SaveChangesAsync();
+
+        await Refresh();
+    }
+}
