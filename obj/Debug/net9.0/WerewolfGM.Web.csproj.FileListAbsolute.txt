@@ -140,3 +140,4 @@ C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\WerewolfGM.Web.pdb
 C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\WerewolfGM.Web.genruntimeconfig.cache
 C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\ref\WerewolfGM.Web.dll
 C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\compressed\qf4s2kbehf-7jkwo52fvx.gz
+C:\Users\Admin\OneDrive\Bureau\lgtr\obj\Debug\net9.0\WerewolfGM.Web.sourcelink.json
