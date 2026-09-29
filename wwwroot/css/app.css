@@ -1056,8 +1056,14 @@ button {
 .my-infos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
 .info-card { padding: 18px 20px; background: var(--color-surface); border: 1px solid var(--color-border); border-left: 4px solid var(--color-gold); border-radius: var(--radius-md); }
 .info-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-gold); }
-.info-content { margin: 8px 0 0; white-space: pre-line; line-height: 1.6; }
-.info-editor-player { margin-top: 18px; padding: 14px 16px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.info-content {
+    margin: 8px 0 0;
+    white-space: pre-line;
+    line-height: 1.6;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-blood-light);
+}.info-editor-player { margin-top: 18px; padding: 14px 16px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
 .info-editor-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 10px; }
 .info-editor-role { font-size: 13px; color: var(--color-text-muted); }
 .info-editor-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
