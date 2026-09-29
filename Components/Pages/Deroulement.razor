@@ -30,6 +30,31 @@
     else
     {
         <section class="deroulement-section">
+            <h2>Rôles restants (@AlivePlayers.Count)</h2>
+
+            @if (RemainingRoles.Count == 0)
+            {
+                <div class="empty-box">Aucun rôle restant.</div>
+            }
+            else
+            {
+                <div class="remaining-roles-list">
+                    @foreach (var entry in RemainingRoles)
+                    {
+                        <button class="remaining-role-chip" @onclick="() => OpenRole(entry.Role)">
+                            <span class="remaining-role-emoji">@entry.Role.Emoji</span>
+                            <span class="remaining-role-name">@entry.Role.Name</span>
+                            @if (entry.Count > 1)
+                            {
+                                <span class="remaining-role-count">×@entry.Count</span>
+                            }
+                        </button>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="deroulement-section">
             <h2>Joueurs en vie (@AlivePlayers.Count)</h2>
 
             @if (AlivePlayers.Count == 0)
@@ -202,6 +227,9 @@
     private List<Player> AlivePlayers = new();
     private List<Player> DeadPlayers = new();
 
+    // Rôles des joueurs encore en vie, regroupés avec leur nombre d'exemplaires
+    private List<(RoleDefinition Role, int Count)> RemainingRoles = new();
+
     private Dictionary<int, string> NoteDrafts = new();
     private HashSet<int> SavedFlags = new();
 
@@ -226,6 +254,13 @@
 
         AlivePlayers = players.Where(p => p.IsAlive).ToList();
         DeadPlayers = players.Where(p => !p.IsAlive).ToList();
+
+        RemainingRoles = AlivePlayers
+            .Where(p => p.RoleDefinition is not null)
+            .GroupBy(p => p.RoleDefinition!.Id)
+            .Select(g => (Role: g.First().RoleDefinition!, Count: g.Count()))
+            .OrderBy(x => x.Role.Name)
+            .ToList();
 
         if (CurrentPlayerId != 0)
         {
