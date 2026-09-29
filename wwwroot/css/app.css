@@ -387,10 +387,14 @@ button {
 
 .role-card-title {
     margin-top: 10px;
-    color: inherit;
+    color: #fff;
     font-size: 16px;
     font-weight: 700;
     transition: color 0.15s ease;
+}
+.role-card-button .role-card-title,
+.role-card-button .role-card {
+    color: #fff;
 }
 
 /* Rôles morts (page déroulement) */
