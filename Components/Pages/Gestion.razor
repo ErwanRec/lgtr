@@ -96,8 +96,6 @@
         }
         else
         {
-            <button class="primary-button" @onclick="GenerateInfos">🐺 Générer les informations</button>
-                @foreach (var w in GenWarnings) { <div class="admin-error-box">@w</div> }
             <table class="admin-players-table">
                 <thead>
                     <tr>
@@ -143,7 +141,7 @@
             </table>
         }
     </section>
-
+    <PlayerInfosEditor />
 </div>
 
 @code {

@@ -1,0 +1,158 @@
+@using Microsoft.EntityFrameworkCore
+@using WerewolfGM.Web.Data
+@using WerewolfGM.Web.Models
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<section class="admin-section">
+    <h2>🔒 Informations secrètes des joueurs</h2>
+
+    <p class="admin-warning">
+        « Générer » recalcule toutes les informations automatiques (nouveau tirage des noms) et remplace celles qui existent.
+        Tu peux ensuite modifier, supprimer ou ajouter des informations joueur par joueur.
+    </p>
+
+    <button class="primary-button" @onclick="Generate">🐺 Générer / régénérer automatiquement</button>
+
+    @if (Error is not null)
+    {
+        <div class="admin-error-box"><strong>Erreur :</strong> @Error</div>
+    }
+
+    @foreach (var w in Warnings)
+    {
+        <div class="admin-error-box">@w</div>
+    }
+
+    @if (Players.Count == 0)
+    {
+        <div class="empty-box" style="margin-top:16px;">Aucun joueur.</div>
+    }
+    else
+    {
+        @foreach (var player in Players)
+        {
+            <div class="info-editor-player">
+                <div class="info-editor-head">
+                    <strong>@player.FullName</strong>
+                    <span class="info-editor-role">@(player.RoleDefinition?.Name ?? "Pas de rôle")</span>
+                </div>
+
+                @foreach (var info in Infos.Where(i => i.PlayerId == player.Id))
+                {
+                    <div class="info-editor-row">
+                        <input class="info-input" placeholder="Titre" @bind="info.Title" />
+                        <input class="info-input info-input-wide" placeholder="Contenu" @bind="info.Content" />
+                        <button class="success-button" @onclick="() => Save(info)">Enregistrer</button>
+                        <button class="danger-button" @onclick="() => Delete(info.Id)">Supprimer</button>
+                    </div>
+                }
+
+                <div class="info-editor-row info-editor-new">
+                    <input class="info-input" placeholder="Nouveau titre" @bind="NewTitle[player.Id]" />
+                    <input class="info-input info-input-wide" placeholder="Nouveau contenu" @bind="NewContent[player.Id]" />
+                    <button class="note-save-button" @onclick="() => Add(player.Id)">+ Ajouter</button>
+                </div>
+            </div>
+        }
+    }
+</section>
+
+@code {
+
+    private List<Player> Players = new();
+    private List<PlayerInfo> Infos = new();
+    private Dictionary<int, string> NewTitle = new();
+    private Dictionary<int, string> NewContent = new();
+    private List<string> Warnings = new();
+    private string? Error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            Players = await db.Players
+                .AsNoTracking()
+                .Include(p => p.RoleDefinition)
+                .Where(p => !p.IsGameMaster)
+                .OrderBy(p => p.FirstName)
+                .ThenBy(p => p.LastName)
+                .ToListAsync();
+
+            Infos = await db.PlayerInfos.AsNoTracking().OrderBy(i => i.Id).ToListAsync();
+
+            foreach (var p in Players)
+            {
+                NewTitle.TryAdd(p.Id, string.Empty);
+                NewContent.TryAdd(p.Id, string.Empty);
+            }
+
+            Error = null;
+        }
+        catch (Exception ex)
+        {
+            Error = ex.InnerException?.Message ?? ex.Message;
+        }
+    }
+
+    private async Task Generate()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            Warnings = await InfoGenerator.GenerateAsync(db);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.InnerException?.Message ?? ex.Message;
+        }
+    }
+
+    private async Task Add(int playerId)
+    {
+        var title = NewTitle[playerId].Trim();
+        var content = NewContent[playerId].Trim();
+        if (title.Length == 0 && content.Length == 0) return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.PlayerInfos.Add(new PlayerInfo
+        {
+            PlayerId = playerId,
+            Title = title.Length == 0 ? "Information" : title,
+            Content = content,
+            IsAuto = false
+        });
+        await db.SaveChangesAsync();
+
+        NewTitle[playerId] = string.Empty;
+        NewContent[playerId] = string.Empty;
+        await Load();
+    }
+
+    private async Task Save(PlayerInfo info)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var entity = await db.PlayerInfos.FindAsync(info.Id);
+        if (entity is null) return;
+
+        entity.Title = info.Title;
+        entity.Content = info.Content;
+        await db.SaveChangesAsync();
+        await Load();
+    }
+
+    private async Task Delete(int infoId)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var entity = await db.PlayerInfos.FindAsync(infoId);
+        if (entity is null) return;
+
+        db.PlayerInfos.Remove(entity);
+        await db.SaveChangesAsync();
+        await Load();
+    }
+}
