@@ -1039,3 +1039,7 @@ button {
 .role-card-image-dead {
     filter: grayscale(0.7) brightness(0.55);
 }
+
+.role-card-title {
+    color: #fff;
+}
