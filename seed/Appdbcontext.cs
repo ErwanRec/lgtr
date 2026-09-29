@@ -96,6 +96,7 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(n => n.TargetPlayerId)
             .OnDelete(DeleteBehavior.Restrict);
+            
         modelBuilder.Entity<PlayerInfo>()
             .HasOne(i => i.Player)
             .WithMany()

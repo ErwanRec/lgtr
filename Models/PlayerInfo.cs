@@ -1,16 +1,9 @@
+using System.Globalization;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using WerewolfGM.Web.Data;
 
 namespace WerewolfGM.Web.Models;
-
-// Classe sociale d'un loup (en plus de son rôle)
-public enum WolfRank
-{
-    None = 0,          // pas un loup
-    Alpha = 1,         // loup-garou alpha
-    Garou = 2,         // loup-garou (dans la meute)
-    PresqueGarou = 3   // loup-presque-garou (hors meute au départ)
-}
 
 // Une information secrète affichée sur l'accueil d'un joueur
 public class PlayerInfo
@@ -22,57 +15,88 @@ public class PlayerInfo
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
 
-    // true = générée automatiquement (supprimée à chaque régénération)
-    // false = ajoutée à la main par le MJ (jamais supprimée automatiquement)
+    // true = générée automatiquement, false = ajoutée à la main par le MJ
     public bool IsAuto { get; set; }
 }
 
 public static class InfoGenerator
 {
-    private static readonly string[] SiblingRoles = { "soeurs", "sœurs", "frères", "freres" };
+    private enum Kind { None, Alpha, Presque, Voyant, PairWolf, Sister, Brother }
 
-    // Retourne la liste des avertissements (ex: "Aucun Loup Alpha défini")
+    // "Loup-garou Voyant" -> "loup garou voyant" ; "Infect père des loups" -> "infect pere des loups"
+    private static string Norm(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var sb = new StringBuilder();
+        foreach (var c in s.Normalize(NormalizationForm.FormD))
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                sb.Append(c);
+
+        var t = sb.ToString().ToLowerInvariant()
+            .Replace("œ", "oe").Replace('-', ' ').Replace('\'', ' ').Replace('’', ' ');
+        return string.Join(' ', t.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static bool IsClassicWolf(string n) => n is "loup garou" or "simple loup garou";
+
+    private static Kind Classify(string n)
+    {
+        if (n.Contains("presque")) return Kind.Presque;
+        if (n.Contains("alpha")) return Kind.Alpha;
+        if (n.Contains("loup") && n.Contains("voyant")) return Kind.Voyant;
+
+        if (IsClassicWolf(n)
+            || n.Contains("infect")
+            || n.Contains("poete")
+            || n.Contains("feutre")
+            || n.Contains("grand mechant"))
+            return Kind.PairWolf;
+
+        if (n.StartsWith("soeur")) return Kind.Sister;
+        if (n.StartsWith("frere")) return Kind.Brother;
+        return Kind.None;
+    }
+
     public static async Task<List<string>> GenerateAsync(AppDbContext db)
     {
         var warnings = new List<string>();
 
-        var oldAuto = await db.PlayerInfos.Where(i => i.IsAuto).ToListAsync();
-        db.PlayerInfos.RemoveRange(oldAuto);
+        db.PlayerInfos.RemoveRange(await db.PlayerInfos.Where(i => i.IsAuto).ToListAsync());
 
         var players = await db.Players
             .Include(p => p.RoleDefinition)
             .Where(p => !p.IsGameMaster)
+            .OrderBy(p => p.Id)
             .ToListAsync();
 
-        var alphas = players.Where(p => p.WolfRank == WolfRank.Alpha).ToList();
-        var garous = players.Where(p => p.WolfRank == WolfRank.Garou).ToList();
-        var almost = players.Where(p => p.WolfRank == WolfRank.PresqueGarou).ToList();
-        var others = players.Where(p => p.WolfRank == WolfRank.None).ToList(); // villageois + solos
+        var entries = players
+            .Select(p => (Player: p, Name: Norm(p.RoleDefinition?.Name)))
+            .Select(x => (x.Player, x.Name, Kind: Classify(x.Name)))
+            .ToList();
 
-        if (alphas.Count == 0 && players.Any(p => p.WolfRank != WolfRank.None))
-            warnings.Add("Aucun Loup Alpha défini.");
+        var alphas   = entries.Where(e => e.Kind == Kind.Alpha).Select(e => e.Player).ToList();
+        var presques = entries.Where(e => e.Kind == Kind.Presque).Select(e => e.Player).ToList();
+        var alphaKnown = entries
+            .Where(e => IsClassicWolf(e.Name) || e.Kind == Kind.Voyant)
+            .Select(e => e.Player).ToList();
+        var nonWolves = players.Where(p => p.Camp != Camp.Loups).ToList();
 
-        bool Is(Player p, string part) =>
-            p.RoleDefinition?.Name.Contains(part, StringComparison.OrdinalIgnoreCase) == true;
-
-        string Names(IEnumerable<Player> list) => string.Join(", ", list.Select(x => x.FullName));
-
-        Player? Pick(List<Player> list) =>
-            list.Count == 0 ? null : list[Random.Shared.Next(list.Count)];
+        string Names(IEnumerable<Player> l) => string.Join(", ", l.Select(x => x.FullName));
+        Player? Pick(List<Player> l) => l.Count == 0 ? null : l[Random.Shared.Next(l.Count)];
 
         void Add(Player p, string title, string content) =>
             db.PlayerInfos.Add(new PlayerInfo { PlayerId = p.Id, Title = title, Content = content, IsAuto = true });
 
-        // Deux noms mélangés : un loup + un joueur non-loup (sans dire lequel est lequel)
-        void AddPair(Player p, Player? wolf)
+        // Deux noms mélangés : un loup + un joueur hors du clan des loups
+        void AddPair(Player p, Player? wolf, string wolfLabel)
         {
             if (wolf is null)
             {
-                warnings.Add($"{p.FullName} : aucun loup à lui indiquer.");
+                warnings.Add($"{p.FullName} : aucun {wolfLabel} dans la partie.");
                 return;
             }
 
-            var names = new[] { wolf.FullName, Pick(others)?.FullName }
+            var names = new[] { wolf.FullName, Pick(nonWolves.Where(x => x.Id != p.Id).ToList())?.FullName }
                 .Where(n => !string.IsNullOrEmpty(n))
                 .OrderBy(_ => Random.Shared.Next())
                 .ToList();
@@ -81,42 +105,50 @@ public static class InfoGenerator
                 string.Join(" et ", names) + " (l'un des deux est un loup, l'autre non).");
         }
 
-        foreach (var p in players)
+        foreach (var (p, _, kind) in entries)
         {
-            if (p.WolfRank != WolfRank.None)
+            switch (kind)
             {
-                // Loup amnésique : aucune info sur la meute
-                if (Is(p, "amnésique") || Is(p, "amnesique")) continue;
+                case Kind.Alpha:
+                    Add(p, "Votre meute",
+                        alphaKnown.Count == 0 ? "Aucun loup pour l'instant." : Names(alphaKnown));
+                    break;
 
-                // Loup-garou voyant : connaît le loup alpha
-                if (Is(p, "voyant"))
+                case Kind.Voyant:
+                    if (alphas.Count == 0) warnings.Add($"{p.FullName} : aucun Loup Alpha dans la partie.");
+                    else Add(p, "Loup Alpha", Names(alphas));
+                    break;
+
+                case Kind.PairWolf:
+                    AddPair(p, Pick(presques), "loup presque-garou");
+                    break;
+
+                case Kind.Presque:
+                    AddPair(p, Pick(alphas), "loup alpha");
+                    break;
+
+                case Kind.Sister:
                 {
-                    if (alphas.Count > 0) Add(p, "Loup Alpha", Names(alphas));
-                    continue;
+                    var others = entries.Where(e => e.Kind == Kind.Sister
+                        && e.Player.RoleDefinitionId == p.RoleDefinitionId && e.Player.Id != p.Id)
+                        .Select(e => e.Player).ToList();
+                    if (others.Count > 0) Add(p, "Votre sœur", Names(others));
+                    break;
                 }
 
-                switch (p.WolfRank)
+                case Kind.Brother:
                 {
-                    case WolfRank.Alpha:
-                        Add(p, "Votre meute",
-                            garous.Count == 0 ? "Aucun loup-garou dans la meute." : Names(garous));
-                        break;
-
-                    case WolfRank.Garou:
-                        AddPair(p, Pick(almost));
-                        break;
-
-                    case WolfRank.PresqueGarou:
-                        AddPair(p, Pick(alphas));
-                        break;
+                    // Triangle : chaque frère connaît le suivant (A→B, B→C, C→A)
+                    var group = entries.Where(e => e.Kind == Kind.Brother
+                        && e.Player.RoleDefinitionId == p.RoleDefinitionId)
+                        .Select(e => e.Player).OrderBy(x => x.Id).ToList();
+                    if (group.Count > 1)
+                    {
+                        var next = group[(group.IndexOf(p) + 1) % group.Count];
+                        Add(p, "Un de vos frères", next.FullName);
+                    }
+                    break;
                 }
-            }
-            else if (p.RoleDefinition is not null
-                     && SiblingRoles.Contains(p.RoleDefinition.Name.Trim().ToLowerInvariant()))
-            {
-                // Sœurs / frères : ils se connaissent
-                var mates = players.Where(x => x.Id != p.Id && x.RoleDefinitionId == p.RoleDefinitionId).ToList();
-                if (mates.Count > 0) Add(p, "Vos alliés de confiance", Names(mates));
             }
         }
 
