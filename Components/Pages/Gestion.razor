@@ -96,6 +96,8 @@
         }
         else
         {
+            <button class="primary-button" @onclick="GenerateInfos">🐺 Générer les informations</button>
+                @foreach (var w in GenWarnings) { <div class="admin-error-box">@w</div> }
             <table class="admin-players-table">
                 <thead>
                     <tr>
@@ -103,6 +105,7 @@
                         <th>Code</th>
                         <th>Statut</th>
                         <th>Rôle actuel</th>
+                        <th>Rang loup</th>
                         <th>Changer de rôle</th>
                         <th>Actions</th>
                     </tr>
@@ -115,6 +118,14 @@
                             <td><code>@player.AccessCode</code></td>
                             <td>@(player.IsAlive ? "🙂 Vivant" : "💀 Mort")</td>
                             <td>@(player.RoleDefinition?.Name ?? "—")</td>
+                            <td>
+                                <select @onchange="e => SetRank(player.Id, e.Value)">
+                                    @foreach (var r in Enum.GetValues<WolfRank>())
+                                    {
+                                        <option value="@r" selected="@(player.WolfRank == r)">@r</option>
+                                    }
+                                </select>
+                            </td>
                             <td>
                                 <select @bind="RoleChangeSelection[player.Id]">
                                     <option value="0">-- choisir --</option>
@@ -164,6 +175,24 @@
     protected override async Task OnInitializedAsync()
     {
         await Refresh();
+    }
+    private List<string> GenWarnings = new();
+
+    private async Task SetRank(int playerId, object? value)
+    {
+        if (!Enum.TryParse<WolfRank>(value?.ToString(), out var rank)) return;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var player = await db.Players.FindAsync(playerId);
+        if (player is null) return;
+        player.WolfRank = rank;
+        await db.SaveChangesAsync();
+        await Refresh();
+    }
+
+    private async Task GenerateInfos()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        GenWarnings = await InfoGenerator.GenerateAsync(db);
     }
 
     private async Task Refresh()

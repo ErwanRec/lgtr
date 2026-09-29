@@ -22,7 +22,7 @@ public class Player
     public string AccessCode { get; set; } = string.Empty;
 
     public bool IsGameMaster { get; set; }
-
+    public WolfRank WolfRank { get; set; } = WolfRank.None;
     public int? RoleDefinitionId { get; set; }
     public RoleDefinition? RoleDefinition { get; set; }
 

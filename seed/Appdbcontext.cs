@@ -6,7 +6,7 @@ namespace WerewolfGM.Web.Data;
 public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-
+    public DbSet<PlayerInfo> PlayerInfos => Set<PlayerInfo>();
     public DbSet<Player> Players => Set<Player>();
     public DbSet<PlayerNote> PlayerNotes => Set<PlayerNote>();
     public DbSet<RoleDefinition> RoleDefinitions => Set<RoleDefinition>();
@@ -96,5 +96,10 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(n => n.TargetPlayerId)
             .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PlayerInfo>()
+            .HasOne(i => i.Player)
+            .WithMany()
+            .HasForeignKey(i => i.PlayerId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

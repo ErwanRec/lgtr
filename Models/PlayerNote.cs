@@ -3,7 +3,6 @@ namespace WerewolfGM.Web.Models;
 public class PlayerNote
 {
     public int Id { get; set; }
-
     public int AuthorPlayerId { get; set; }
     public Player Author { get; set; } = null!;
 
