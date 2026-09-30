@@ -24,7 +24,7 @@ public static class InfoGenerator
     private enum Kind { None, Alpha, Presque, Voyant, PairWolf, Sister, Brother }
 
     // "Loup-garou Voyant" -> "loup garou voyant" ; "Infect père des loups" -> "infect pere des loups"
-    private static string Norm(string? s)
+    public static string Norm(string? s)
     {
         if (string.IsNullOrWhiteSpace(s)) return "";
         var sb = new StringBuilder();

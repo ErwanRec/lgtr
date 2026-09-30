@@ -40,6 +40,25 @@ public static class DbInitializer
             db.SaveChanges();
         }
 
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS TrackerFields (
+                Id INTEGER NOT NULL CONSTRAINT PK_TrackerFields PRIMARY KEY AUTOINCREMENT,
+                PlayerId INTEGER NOT NULL,
+                Label TEXT NOT NULL,
+                Value TEXT NOT NULL,
+                [Order] INTEGER NOT NULL,
+                CONSTRAINT FK_TrackerFields_Players FOREIGN KEY (PlayerId) REFERENCES Players (Id) ON DELETE CASCADE
+            );");
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS PlayerTargets (
+                Id INTEGER NOT NULL CONSTRAINT PK_PlayerTargets PRIMARY KEY AUTOINCREMENT,
+                SourcePlayerId INTEGER NOT NULL,
+                TargetPlayerId INTEGER NOT NULL,
+                CONSTRAINT FK_PlayerTargets_Source FOREIGN KEY (SourcePlayerId) REFERENCES Players (Id) ON DELETE CASCADE,
+                CONSTRAINT FK_PlayerTargets_Target FOREIGN KEY (TargetPlayerId) REFERENCES Players (Id) ON DELETE CASCADE
+            );");
+        db.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IF NOT EXISTS IX_PlayerTargets_Pair ON PlayerTargets (SourcePlayerId, TargetPlayerId);");
+
         if (!db.ChatGroups.Any(g => g.Name == "Village"))
         {
             db.ChatGroups.Add(new ChatGroup

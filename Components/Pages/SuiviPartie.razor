@@ -1,0 +1,199 @@
+@page "/mj/suivi"
+@attribute [Authorize(Policy = "GameMaster")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using WerewolfGM.Web.Data
+@using WerewolfGM.Web.Models
+
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>Suivi de la partie - MJ</PageTitle>
+
+<div class="admin-page">
+
+    <header class="roles-page-header">
+        <div>
+            <p class="eyebrow">MAÎTRE DU JEU</p>
+            <h1>Suivi de la partie</h1>
+        </div>
+        <a class="roles-back-button" href="/mj/tableau-de-bord">← Retour</a>
+    </header>
+
+    @if (Error is not null)
+    {
+        <div class="admin-error-box"><strong>Erreur :</strong> @Error</div>
+    }
+
+    <section class="admin-section">
+        <h2>🎯 Ciblages (loups et chasseur)</h2>
+        <p class="suivi-help">Coche les joueurs (lignes) déjà ciblés par chaque loup ou par le chasseur (colonnes). Cette grille est visible uniquement par les MJ.</p>
+
+        @if (Loading)
+        {
+            <div class="loading-box">Chargement...</div>
+        }
+        else if (Shooters.Count == 0)
+        {
+            <div class="empty-box">Aucun loup ni chasseur dans la partie.</div>
+        }
+        else
+        {
+            <div class="suivi-grid-wrap">
+                <table class="suivi-grid">
+                    <thead>
+                        <tr>
+                            <th>Joueur ciblé</th>
+                            @foreach (var s in Shooters)
+                            {
+                                <th>
+                                    <div>@s.FullName</div>
+                                    <small>@(s.RoleDefinition?.Name) · @Targets.Count(t => t.Source == s.Id) cible(s)</small>
+                                </th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var target in Players)
+                        {
+                            <tr class="@(target.IsAlive ? "" : "row-dead")">
+                                <td class="suivi-name">@target.FullName @(target.IsAlive ? "" : "💀")</td>
+                                @foreach (var s in Shooters)
+                                {
+                                    <td class="suivi-cell">
+                                        @if (s.Id == target.Id)
+                                        {
+                                            <span>—</span>
+                                        }
+                                        else
+                                        {
+                                            <input type="checkbox"
+                                                   checked="@Targets.Contains((s.Id, target.Id))"
+                                                   @onchange="e => Toggle(s.Id, target.Id, (bool)(e.Value ?? false))" />
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="admin-section">
+        <h2>📋 Suivi des rôles</h2>
+        <p class="suivi-help">Ces valeurs sont visibles par le joueur concerné sur son accueil. Elles s'enregistrent dès que tu quittes le champ.</p>
+
+        <button class="note-save-button" @onclick="ResetAll">Réinitialiser depuis les rôles</button>
+
+        @foreach (var player in Players.Where(p => Fields.Any(f => f.PlayerId == p.Id)))
+        {
+            <div class="info-editor-player">
+                <div class="info-editor-head">
+                    <strong>@player.FullName</strong>
+                    <span class="info-editor-role">@(player.RoleDefinition?.Name)</span>
+                </div>
+
+                @foreach (var f in Fields.Where(f => f.PlayerId == player.Id))
+                {
+                    <div class="info-editor-row">
+                        <span class="suivi-label">@f.Label</span>
+                        <input class="info-input info-input-wide"
+                               value="@f.Value"
+                               @onchange="e => SaveValue(f.Id, e.Value?.ToString() ?? string.Empty)" />
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+</div>
+
+@code {
+
+    private bool Loading = true;
+    private string? Error;
+
+    private List<Player> Players = new();
+    private List<Player> Shooters = new();
+    private List<TrackerField> Fields = new();
+    private HashSet<(int Source, int Target)> Targets = new();
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            Players = await db.Players
+                .AsNoTracking()
+                .Include(p => p.RoleDefinition)
+                .Where(p => !p.IsGameMaster)
+                .OrderBy(p => p.FirstName).ThenBy(p => p.LastName)
+                .ToListAsync();
+
+            // Colonnes de la grille : les loups puis le chasseur
+            Shooters = Players
+                .Where(p => p.Camp == Camp.Loups
+                         || InfoGenerator.Norm(p.RoleDefinition?.Name).Contains("chasseur"))
+                .OrderBy(p => p.Camp == Camp.Loups ? 0 : 1)
+                .ThenBy(p => p.FirstName)
+                .ToList();
+
+            Fields = await db.TrackerFields.AsNoTracking()
+                .OrderBy(f => f.PlayerId).ThenBy(f => f.Order).ToListAsync();
+
+            var targets = await db.PlayerTargets.AsNoTracking()
+                .Select(t => new { t.SourcePlayerId, t.TargetPlayerId }).ToListAsync();
+            Targets = targets.Select(t => (t.SourcePlayerId, t.TargetPlayerId)).ToHashSet();
+
+            Error = null;
+        }
+        catch (Exception ex)
+        {
+            Error = ex.InnerException?.Message ?? ex.Message;
+        }
+
+        Loading = false;
+    }
+
+    private async Task Toggle(int source, int target, bool on)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var existing = await db.PlayerTargets
+            .FirstOrDefaultAsync(t => t.SourcePlayerId == source && t.TargetPlayerId == target);
+
+        if (on && existing is null)
+            db.PlayerTargets.Add(new PlayerTarget { SourcePlayerId = source, TargetPlayerId = target });
+        else if (!on && existing is not null)
+            db.PlayerTargets.Remove(existing);
+
+        await db.SaveChangesAsync();
+
+        if (on) Targets.Add((source, target)); else Targets.Remove((source, target));
+    }
+
+    private async Task SaveValue(int fieldId, string value)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var field = await db.TrackerFields.FindAsync(fieldId);
+        if (field is null) return;
+
+        field.Value = value.Trim();
+        await db.SaveChangesAsync();
+
+        var local = Fields.FirstOrDefault(f => f.Id == fieldId);
+        if (local is not null) local.Value = field.Value;
+    }
+
+    private async Task ResetAll()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        await TrackerGenerator.ResetAllAsync(db);
+        await Load();
+    }
+}

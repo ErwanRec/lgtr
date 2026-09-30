@@ -290,6 +290,7 @@
         await db.SaveChangesAsync();
 
         GenWarnings = await InfoGenerator.GenerateAsync(db);
+        await TrackerGenerator.ResetAllAsync(db);
 
         LastCreatedPlayers = created;
         NamesInput = string.Empty;
@@ -337,6 +338,7 @@
         player.RoleDefinitionId = role.Id;
         player.Camp = role.Camp;
         await db.SaveChangesAsync();
+        await TrackerGenerator.ResetPlayerAsync(db, playerId);
 
         await Refresh();
     }

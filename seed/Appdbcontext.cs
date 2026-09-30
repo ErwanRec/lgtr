@@ -5,6 +5,8 @@ namespace WerewolfGM.Web.Data;
 
 public class AppDbContext : DbContext
 {
+    public DbSet<TrackerField> TrackerFields => Set<TrackerField>();
+    public DbSet<PlayerTarget> PlayerTargets => Set<PlayerTarget>();
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
     public DbSet<PlayerInfo> PlayerInfos => Set<PlayerInfo>();
     public DbSet<Player> Players => Set<Player>();
@@ -102,5 +104,18 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(i => i.PlayerId)
             .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<TrackerField>()
+            .HasOne(f => f.Player).WithMany()
+            .HasForeignKey(f => f.PlayerId).OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<PlayerTarget>()
+            .HasIndex(t => new { t.SourcePlayerId, t.TargetPlayerId }).IsUnique();
+        modelBuilder.Entity<PlayerTarget>()
+            .HasOne(t => t.SourcePlayer).WithMany()
+            .HasForeignKey(t => t.SourcePlayerId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<PlayerTarget>()
+            .HasOne(t => t.TargetPlayer).WithMany()
+            .HasForeignKey(t => t.TargetPlayerId).OnDelete(DeleteBehavior.Cascade);
     }
+    
 }

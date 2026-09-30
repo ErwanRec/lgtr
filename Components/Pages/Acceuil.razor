@@ -118,6 +118,23 @@
 
         </section>
 
+        @if (Fields.Count > 0)
+        {
+            <section class="my-infos-section">
+                <h2>📋 Suivi de votre rôle</h2>
+
+                <div class="my-infos-grid">
+                    @foreach (var f in Fields)
+                    {
+                        <div class="info-card">
+                            <span class="info-title">@f.Label</span>
+                            <p class="info-content">@(string.IsNullOrWhiteSpace(f.Value) ? "—" : f.Value)</p>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
         @if (Infos.Count > 0)
         {
             <section class="my-infos-section">
@@ -156,6 +173,7 @@
     private string RoleImageUrl = string.Empty;
 
     private List<PlayerInfo> Infos = new();
+    private List<TrackerField> Fields = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -199,6 +217,12 @@
                 .AsNoTracking()
                 .Where(i => i.PlayerId == playerId)
                 .OrderBy(i => i.Id)
+                .ToListAsync();
+
+            Fields = await db.TrackerFields
+                .AsNoTracking()
+                .Where(f => f.PlayerId == playerId)
+                .OrderBy(f => f.Order)
                 .ToListAsync();
 
             if (player?.RoleDefinition is not null)
