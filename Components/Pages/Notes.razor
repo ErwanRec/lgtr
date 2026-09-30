@@ -35,10 +35,6 @@
                 <div class="note-row @(player.Id == CurrentPlayerId ? "note-row-self" : "")">
                     <div class="note-row-name">
                         @player.FullName
-                        @if (player.Id == CurrentPlayerId)
-                        {
-                            <span class="note-self-tag">(vous)</span>
-                        }
                         @if (!player.IsAlive)
                         {
                             <span class="note-dead-tag">💀</span>
