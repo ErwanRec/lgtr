@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using WerewolfGM.Web.Models;
 
 namespace WerewolfGM.Web.Data;
