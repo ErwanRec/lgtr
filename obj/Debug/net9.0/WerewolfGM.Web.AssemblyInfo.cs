@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WerewolfGM.Web")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ac9a031bb6828fe63c91862d1aab75486958a8b5")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+202655c7d5a6573b378f3c6f22323e85c296c13d")]
 [assembly: System.Reflection.AssemblyProductAttribute("WerewolfGM.Web")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WerewolfGM.Web")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
