@@ -8,15 +8,19 @@ using WerewolfGM.Web.Hubs;
 using WerewolfGM.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080"; 
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
-// ---------- Base de données (SQLite, un seul fichier) ----------
+// ---------- Base de données (PostgreSQL – Neon) ----------
 var connectionString = builder.Configuration.GetConnectionString("Default")
-    ?? "Data Source=werewolf.db";
-builder.Services.AddDbContextFactory<AppDbContext>(options => options.UseSqlite(connectionString));
+    ?? throw new InvalidOperationException("ConnectionStrings:Default manquante.");
+
+builder.Services.AddDbContextFactory<AppDbContext>(options =>
+    options.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3)));
 
 // ---------- Services métier ----------
 builder.Services.AddScoped<PlayerService>();
