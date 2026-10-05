@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "kjURXWv7VFs=",
+  "dgSpecHash": "YLbMBwpm638=",
   "success": true,
   "projectFilePath": "C:\\Users\\Admin\\OneDrive\\Bureau\\lgtr\\WerewolfGM.Web.csproj",
   "expectedPackageFiles": [
@@ -54,16 +54,5 @@
     "C:\\Users\\Admin\\.nuget\\packages\\system.text.json\\9.0.0\\system.text.json.9.0.0.nupkg.sha512",
     "C:\\Users\\Admin\\.nuget\\packages\\system.threading.channels\\7.0.0\\system.threading.channels.7.0.0.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1903",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.10 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q",
-      "libraryId": "SQLitePCLRaw.lib.e_sqlite3",
-      "targetGraphs": [
-        "net9.0"
-      ]
-    }
-  ]
+  "logs": []
 }

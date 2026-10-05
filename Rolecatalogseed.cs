@@ -59,7 +59,7 @@ public static class RoleCatalogSeed
 
         new() { Name = "Loup feutré", Camp = Camp.Loups, Emoji = "🥷🐺",
             ShortDescription = "Appara36ît comme simple villageois aux yeux des enquêteurs.",
-            FullDescription = "Si un autre rôle enquête sur lui (voyante, voyant, juge...), il apparaît comme un simple villageois plutôt que comme loup.",
+            FullDescription = "Si un autre rôle enquête sur lui (voyante, voyant, juge...), il apparaît comme un rôle villageois plutôt que comme loup.",
             HasFixedTimeAction = false },
 
         // ---------- VILLAGEOIS ----------
