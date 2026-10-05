@@ -33,7 +33,7 @@ public static class DbInitializer
             {
                 FirstName = "Maître",
                 LastName = "du Jeu",
-                AccessCode = "000",
+                AccessCode = "MJLGTR1",
                 IsGameMaster = true,
                 IsAlive = true,
                 Camp = Camp.Villageois
